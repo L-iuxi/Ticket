@@ -50,13 +50,18 @@ func (l *BuyTicketLogic) BuyTicket(req *types.BuyTicketReq) (*types.BuyTicketRes
 	ticketTypeId := req.TicketTypeID
 
 	limitKey := fmt.Sprintf("limit:buy:user:%d", userID)
+
 	bucketKey := fmt.Sprintf("bucket:ticket:%d", ticketTypeId)
+
 	lockKey := fmt.Sprintf("lock:order:%d:%d:%d:%d", userID, req.EventID, req.ShowID, req.TicketTypeID)
 	lockValue := uuid.NewString()
 
 	pipe := l.svcCtx.Redis.Pipeline()
+
 	rateLimitCmd := pipe.Eval(l.ctx, redis.RateLimitLua, []string{limitKey}, int(time.Second.Seconds()), 5)
+
 	tokenBucketCmd := pipe.Eval(l.ctx, redis.TokenBucketLua, []string{bucketKey}, 200, 100, time.Now().Unix())
+
 	lockCmd := pipe.SetNX(l.ctx, lockKey, lockValue, 30*time.Second)
 
 	if _, err := pipe.Exec(l.ctx); err != nil {
